@@ -1,31 +1,94 @@
-# GlobalWebIndex Engineering Challenge
+# User Favourites Service
 
-## Introduction
+## Scope
+A web server that lets users manage their favourite assets including charts, insights and audiences.  
+Supports listing, adding, removing and editing favourites.
 
-This challenge is designed to give you the opportunity to demonstrate your abilities as a software engineer and specifically your knowledge of the Go language.
+## How to Run
 
-On the surface the challenge is trivial to solve, however you should choose to add features or capabilities which you feel demonstrate your skills and knowledge the best. For example, you could choose to optimise for performance and concurrency, you could choose to add a robust security layer or ensure your application is highly available. Or all of these.
+### Run locally
+To build and run the program:
+```bash
+go run main.go
+```
+Or, if you want to build first:
+```bash
+go build -o favourites
+./favourites
+```
 
-Of course, usually we would choose to solve any given requirement with the simplest possible solution, however that is not the spirit of this challenge.
+### Run with Docker
+```bash
+docker build -t favourites .
+docker run --rm -p 8080:8080 favourites
+```
 
-## Challenge
+## How to Test
+Tests cover basic functionality and a few error scenarios.
 
-Let's say that in GWI platform all of our users have access to a huge list of assets. We want our users to have a peronal list of favourites, meaning assets that favourite or “star” so that they have them in their frontpage dashboard for quick access. An asset can be one the following
-* Chart (that has a small title, axes titles and data)
-* Insight (a small piece of text that provides some insight into a topic, e.g. "40% of millenials spend more than 3hours on social media daily")
-* Audience (which is a series of characteristics, for that exercise lets focus on gender (Male, Female), birth country, age groups, hours spent daily on social media, number of purchases last month)
-e.g. Males from 24-35 that spent more than 3 hours on social media daily.
+Run them with:
+```bash
+go test ./...
+```
 
-Build a web server which has some endpoint to receive a user id and return a list of all the user’s favourites. Also we want endpoints that would add an asset to favourites, remove it, or edit its description. Assets obviously can share some common attributes (like their description) but they also have completely different structure and data. It’s up to you to decide the structure and we are not looking for something overly complex here (especially for the cases of audiences). There is no need to have/deploy/create an actual database although we would like to discuss about storage options and data representations.
+## Usage ecamples
+Add a favourite  
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"assetId":"chart-42", "assetType":"chart", "description":"Top sales", "metadata":{"title":"Sales Q4","axes":["month","revenue"]}}' \
+  http://localhost:8080/favourites/user123
+```
+`Response 201, with created entry including generated id`
 
-Note that users have no limit on how many assets they want on their favourites so your service will need to provide a reasonable response time.
+```
+{
+  "id": "fav-1",
+  "assetId": "chart-42",
+  "assetType": "chart",
+  "description": "Top sales",
+  "metadata": { "title": "Sales Q4", "axes": ["month","revenue"] },
+  "createdAt": "2025-09-11T17:18:53.9766385+03:00"
+}
+```
 
-A working server application with functional API is required, along with a clear readme.md. Useful and passing tests would be also be viewed favourably
+List of favourites per user  
+```bash
+curl -s http://localhost:8080/favourites/user123 | jq
+```
+`Response 200`
 
-It is appreciated, though not required, if a Dockerfile is included.
+  ```
+  [
+    {
+      "id": "fav-1",
+      "assetId": "chart-42",
+      "assetType": "chart",
+      "description": "Top sales",
+      "metadata": { "title": "Sales Q4", "axes": ["month","revenue"] },
+      "createdAt": "2025-09-11T17:18:53.9766385+03:00"
+    }
+  ]
+  ```
 
-## Submission
+Update an asset in favourites  
+```bash
+curl -X PUT -H "Content-Type: application/json" \
+  -d '{"assetId":"chart-21", "assetType":"chart", "description":"Sales frequency", "metadata":{"title":"Annual retention","axes":["month","invoice_count"]}}' \
+  http://localhost:8080/favourites/user123/fav-1
+```
 
-Just create a fork from the current repo and send it to us!
+Delete a favourite  
+```bash
+curl -X DELETE http://localhost:8080/favourites/USER123/fav-1
+```
 
-Good luck, potential colleague!
+## Assumptions
+- REST API endpoints to fetch, add, remove and update assets in favourites list
+- JSON request/response
+- In-memory store for the challenge purposes
+- Unit tests for GET, POST, PUT, PATCH and DELETE verbs
+- assetId is handled by other platform services. Favourites service does not validate asset existence.
+
+## Next steps
+- Ephemeral storage, currently in memory, to chaνge into platform-wide storage service(s)
+- Scalability issues: pagination for large lists, persistent storage (Redis/Postgres JSONB), caching 
