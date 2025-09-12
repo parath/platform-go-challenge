@@ -79,16 +79,16 @@ curl -X PUT -H "Content-Type: application/json" \
 
 Delete a favourite  
 ```bash
-curl -X DELETE http://localhost:8080/favourites/USER123/fav-1
+curl -X DELETE http://localhost:8080/favourites/user123/fav-1
 ```
 
 ## Assumptions
 - REST API endpoints to fetch, add, remove and update assets in favourites list
 - JSON request/response
 - In-memory store for the challenge purposes
-- Unit tests for GET, POST, PUT, PATCH and DELETE verbs
-- assetId is handled by other platform services. Favourites service does not validate asset existence.
+- Tests for GET, POST, PUT, PATCH and DELETE verbs and store functions
 
 ## Next steps
-- Ephemeral storage, currently in memory, to chaνge into platform-wide storage service(s)
-- Scalability issues: pagination for large lists, persistent storage (Redis/Postgres JSONB), caching 
+- Solution is base on in-memory store which makes storage ephemeral and works for single instace only. Persistent storage should be used, for instance Postgres JSONB, or adopt with platform-wide storage solution.
+- Performance: caching per user with Redis since it is shown in the frontpage
+- Performance: pagination for very large lists
