@@ -14,35 +14,21 @@ import (
 	"github.com/parath/platform-go-challenge/internal/favourites"
 )
 
-// --- MockStore για testing error paths ---
+// --- MockStore for testing error paths ---
 type MockStore struct {
 	Err error
 }
 
-func (m *MockStore) AddFavourite(favourites.Favourite) error {
-	return m.Err
-}
-
-func (m *MockStore) GetFavourites(userID string) ([]favourites.Favourite, error) {
-	return nil, m.Err
-}
-
+func (m *MockStore) AddFavourite(favourites.Favourite) error                     { return m.Err }
+func (m *MockStore) GetFavourites(userID string) ([]favourites.Favourite, error) { return nil, m.Err }
 func (m *MockStore) UpdateFavourite(userID, favouriteID string, update favourites.Favourite) (favourites.Favourite, error) {
 	return favourites.Favourite{}, m.Err
 }
-
-func (m *MockStore) DeleteFavourite(userID, favouriteID string) error {
-	return m.Err
-}
-
-func (m *MockStore) NextFavouriteID() string {
-	return "fav-mock"
-}
+func (m *MockStore) DeleteFavourite(userID, favouriteID string) error { return m.Err }
+func (m *MockStore) NextFavouriteID() string                          { return "fav-mock" }
 
 // --- Helpers for integration tests ---
-func newTestServer() *mux.Router {
-	return NewServer(favourites.NewInMemoryStore())
-}
+func newTestServer() *mux.Router { return NewServer(favourites.NewInMemoryStore()) }
 
 func doRequest(t *testing.T, r http.Handler, method, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
@@ -148,7 +134,7 @@ func TestPutFavourite_Update(t *testing.T) {
 
 func TestPutFavourite_NotFound(t *testing.T) {
 	r := newTestServer()
-	upd := map[string]any{"assetId": "chart-1"}
+	upd := map[string]any{"assetId": "chart-1", "assetType": "chart"}
 	rr := doRequest(t, r, http.MethodPut, "/favourites/user-1/fav-999", upd)
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rr.Code)
@@ -167,7 +153,7 @@ func TestPutFavourite_NotFound(t *testing.T) {
 
 func TestDeleteFavourite(t *testing.T) {
 	r := newTestServer()
-	created := createFavourite(t, r, "user-1", map[string]any{"assetId": "a1"})
+	created := createFavourite(t, r, "user-1", map[string]any{"assetId": "a1", "assetType": "chart"})
 	rr := doRequest(t, r, http.MethodDelete, "/favourites/"+created.UserID+"/"+created.ID, nil)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", rr.Code)
@@ -214,12 +200,60 @@ func TestGetFavourites_StoreError(t *testing.T) {
 func TestAddFavourite_StoreError(t *testing.T) {
 	badStore := &MockStore{Err: errors.New("boom")}
 	r := NewServer(badStore)
-	payload := map[string]any{"assetId": "a1"}
+	payload := map[string]any{"assetId": "a1", "assetType": "chart"}
 	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", rr.Code)
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("expected application/json, got %s", ct)
+	}
+}
+
+// --- Validation tests ---
+func TestPostFavourite_Validation_MissingAssetId(t *testing.T) {
+	r := newTestServer()
+	payload := map[string]any{
+		"assetType": "chart",
+		"assetData": map[string]any{"title": "X"},
+	}
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestPostFavourite_Validation_InvalidAssetType(t *testing.T) {
+	r := newTestServer()
+	payload := map[string]any{
+		"assetId":   "chart-1",
+		"assetType": "wrong",
+	}
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+// --- Conflict tests ---
+func TestPostFavourite_DuplicateConflict(t *testing.T) {
+	r := newTestServer()
+	payload := map[string]any{"assetId": "a1", "assetType": "chart"}
+	_ = doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rr.Code)
+	}
+}
+
+func TestPutFavourite_ChangeToExistingAsset_Conflict(t *testing.T) {
+	r := newTestServer()
+	fav1 := createFavourite(t, r, "user-1", map[string]any{"assetId": "a1", "assetType": "chart"})
+	_ = createFavourite(t, r, "user-1", map[string]any{"assetId": "a2", "assetType": "chart"})
+	upd := favourites.Favourite{AssetID: "a2", AssetType: "chart"}
+	path := "/favourites/" + fav1.UserID + "/" + fav1.ID
+	rr := doRequest(t, r, http.MethodPut, path, upd)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rr.Code)
 	}
 }
