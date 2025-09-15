@@ -16,9 +16,18 @@ type Server struct {
 	store favourites.Store
 }
 
+type ErrorCode string
+
+const (
+	CodeInvalidBody ErrorCode = "invalid_body"
+	CodeStoreError  ErrorCode = "store_error"
+	CodeNotFound    ErrorCode = "not_found"
+	CodeConflict    ErrorCode = "conflict"
+)
+
 type apiError struct {
-	Error string `json:"error"`
-	Code  string `json:"code,omitempty"`
+	Error string    `json:"error"`
+	Code  ErrorCode `json:"code,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -37,7 +46,7 @@ func logRequest(r *http.Request, extras string) {
 	log.Printf("request: %s %s", r.Method, r.URL.Path)
 }
 
-func writeError(w http.ResponseWriter, r *http.Request, status int, msg string, code string) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, msg string, code ErrorCode) {
 	logRequest(r, fmt.Sprintf("status=%d code=%s msg=%s", status, code, msg))
 	writeJSON(w, status, apiError{Error: msg, Code: code})
 }
@@ -63,18 +72,20 @@ func isValidAssetType(t string) bool {
 	}
 }
 
-func validateFavouriteInput(f favourites.Favourite) (string, string) {
+// This service stores a lightweight snapshot of the upstream asset, so we cap assetData
+// around 100KB to prevent abuse.
+func validateFavouriteInput(f favourites.Favourite) (string, ErrorCode) {
 	if f.AssetID == "" {
-		return "assetId is required", "invalid_body"
+		return "assetId is required", CodeInvalidBody
 	}
 	if !isValidAssetType(string(f.AssetType)) {
-		return "invalid assetType", "invalid_body"
+		return "invalid assetType", CodeInvalidBody
 	}
-	if len(f.AssetData) > 100*1024 { // 100KB safety cap
-		return "assetData too large", "invalid_body"
+	if len(f.AssetData) > 100*1024 { // ~100KB safety cap
+		return "assetData too large", CodeInvalidBody
 	}
 	if len(f.Description) > 512 {
-		return "description too long", "invalid_body"
+		return "description too long", CodeInvalidBody
 	}
 	return "", ""
 }
@@ -94,7 +105,7 @@ func (s *Server) getFavouritesHandler(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["userId"]
 	favs, err := s.store.GetFavourites(userID)
 	if err != nil {
-		writeError(w, r, http.StatusInternalServerError, "failed to get favourites", "store_error")
+		writeError(w, r, http.StatusInternalServerError, "failed to get favourites", CodeStoreError)
 		return
 	}
 
@@ -105,7 +116,7 @@ func (s *Server) addFavouriteHandler(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["userId"]
 	var f favourites.Favourite
 	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid request body", "invalid_body")
+		writeError(w, r, http.StatusBadRequest, "invalid request body", CodeInvalidBody)
 		return
 	}
 	if msg, code := validateFavouriteInput(f); msg != "" {
@@ -135,7 +146,7 @@ func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 	favID := vars["id"]
 	var upd favourites.Favourite
 	if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid request body", "invalid_body")
+		writeError(w, r, http.StatusBadRequest, "invalid request body", CodeInvalidBody)
 		return
 	}
 	if msg, code := validateFavouriteInput(upd); msg != "" {
@@ -146,14 +157,14 @@ func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 	updated, err := s.store.UpdateFavourite(userID, favID, upd)
 	if err != nil {
 		if errors.Is(err, favourites.ErrNotFound) {
-			writeError(w, r, http.StatusNotFound, err.Error(), "not_found")
+			writeError(w, r, http.StatusNotFound, err.Error(), CodeNotFound)
 			return
 		}
 		if errors.Is(err, favourites.ErrConflict) {
-			writeError(w, r, http.StatusConflict, "favourite already exists for user and asset", "conflict")
+			writeError(w, r, http.StatusConflict, "favourite already exists for user and asset", CodeConflict)
 			return
 		}
-		writeError(w, r, http.StatusInternalServerError, "internal server error", "store_error")
+		writeError(w, r, http.StatusInternalServerError, "internal server error", CodeStoreError)
 		return
 	}
 
@@ -167,9 +178,9 @@ func (s *Server) deleteFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 	err := s.store.DeleteFavourite(userID, favID)
 	if err != nil {
 		if errors.Is(err, favourites.ErrNotFound) {
-			writeError(w, r, http.StatusNotFound, err.Error(), "not_found")
+			writeError(w, r, http.StatusNotFound, err.Error(), CodeNotFound)
 		} else {
-			writeError(w, r, http.StatusInternalServerError, "internal server error", "store_error")
+			writeError(w, r, http.StatusInternalServerError, "internal server error", CodeStoreError)
 		}
 		return
 	}
