@@ -105,7 +105,7 @@ func TestPostFavourite_CreateAndList(t *testing.T) {
 		"assetId":     "chart-42",
 		"assetType":   "chart",
 		"description": "Top sales",
-		"metadata":    map[string]any{"title": "Sales Q4"},
+		"assetData":   map[string]any{"title": "Sales Q4"},
 	}
 	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
 	if rr.Code != http.StatusCreated {
@@ -153,6 +153,16 @@ func TestPutFavourite_NotFound(t *testing.T) {
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rr.Code)
 	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
+	}
+	var errBody map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &errBody); err != nil {
+		t.Fatalf("invalid json error body: %v", err)
+	}
+	if _, ok := errBody["error"]; !ok {
+		t.Fatalf("expected error field in body, got %v", errBody)
+	}
 }
 
 func TestDeleteFavourite(t *testing.T) {
@@ -167,6 +177,9 @@ func TestDeleteFavourite(t *testing.T) {
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rr.Code)
 	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
+	}
 }
 
 func TestPostFavourite_InvalidBody(t *testing.T) {
@@ -174,6 +187,13 @@ func TestPostFavourite_InvalidBody(t *testing.T) {
 	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", "not-json")
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
+	}
+	var errBody map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &errBody); err != nil {
+		t.Fatalf("invalid json error body: %v", err)
 	}
 }
 
@@ -186,6 +206,9 @@ func TestGetFavourites_StoreError(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", rr.Code)
 	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
+	}
 }
 
 func TestAddFavourite_StoreError(t *testing.T) {
@@ -195,5 +218,8 @@ func TestAddFavourite_StoreError(t *testing.T) {
 	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
 	}
 }

@@ -14,12 +14,27 @@ type Server struct {
 	store favourites.Store
 }
 
+type apiError struct {
+	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, apiError{Error: msg})
+}
+
 func NewServer(store favourites.Store) *mux.Router {
 	s := &Server{store: store}
 	r := mux.NewRouter()
 	r.HandleFunc("/favourites/{userId}", s.getFavouritesHandler).Methods("GET")
 	r.HandleFunc("/favourites/{userId}", s.addFavouriteHandler).Methods("POST")
-	r.HandleFunc("/favourites/{userId}/{id}", s.updateFavouriteHandler).Methods("PUT", "PATCH")
+	r.HandleFunc("/favourites/{userId}/{id}", s.updateFavouriteHandler).Methods("PUT")
 	r.HandleFunc("/favourites/{userId}/{id}", s.deleteFavouriteHandler).Methods("DELETE")
 	return r
 }
@@ -29,22 +44,18 @@ func (s *Server) getFavouritesHandler(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["userId"]
 	favs, err := s.store.GetFavourites(userID)
 	if err != nil {
-		http.Error(w, "failed to get favourites", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "failed to get favourites")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(favs); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	writeJSON(w, http.StatusOK, favs)
 }
 
 func (s *Server) addFavouriteHandler(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["userId"]
 	var f favourites.Favourite
 	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	f.UserID = userID
@@ -52,16 +63,11 @@ func (s *Server) addFavouriteHandler(w http.ResponseWriter, r *http.Request) {
 	f.CreatedAt = time.Now()
 	err := s.store.AddFavourite(f)
 	if err != nil {
-		http.Error(w, "failed to add favourite", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "failed to add favourite")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(f); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	writeJSON(w, http.StatusCreated, f)
 }
 
 func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,24 +76,20 @@ func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 	favID := vars["id"]
 	var upd favourites.Favourite
 	if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	updated, err := s.store.UpdateFavourite(userID, favID, upd)
 	if err != nil {
 		if errors.Is(err, favourites.ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			writeError(w, http.StatusNotFound, err.Error())
 		} else {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(updated); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) deleteFavouriteHandler(w http.ResponseWriter, r *http.Request) {
@@ -97,9 +99,9 @@ func (s *Server) deleteFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 	err := s.store.DeleteFavourite(userID, favID)
 	if err != nil {
 		if errors.Is(err, favourites.ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			writeError(w, http.StatusNotFound, err.Error())
 		} else {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}

@@ -31,11 +31,11 @@ Run them with:
 go test ./...
 ```
 
-## Usage ecamples
-Add a favourite  
+## Usage examples
+- Add a favourite  
 ```bash
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"assetId":"chart-42", "assetType":"chart", "description":"Top sales", "metadata":{"title":"Sales Q4","axes":["month","revenue"]}}' \
+  -d '{"assetId":"chart-42", "assetType":"chart", "description":"Top sales", "assetData":{"title":"Sales Q4","axes":["month","revenue"]}}' \
   http://localhost:8080/favourites/user123
 ```
 `Response 201, with created entry including generated id`
@@ -46,12 +46,12 @@ curl -X POST -H "Content-Type: application/json" \
   "assetId": "chart-42",
   "assetType": "chart",
   "description": "Top sales",
-  "metadata": { "title": "Sales Q4", "axes": ["month","revenue"] },
+  "assetData": { "title": "Sales Q4", "axes": ["month","revenue"] },
   "createdAt": "2025-09-11T17:18:53.9766385+03:00"
 }
 ```
 
-List of favourites per user  
+- List favourites for a user  
 ```bash
 curl -s http://localhost:8080/favourites/user123 | jq
 ```
@@ -64,31 +64,53 @@ curl -s http://localhost:8080/favourites/user123 | jq
       "assetId": "chart-42",
       "assetType": "chart",
       "description": "Top sales",
-      "metadata": { "title": "Sales Q4", "axes": ["month","revenue"] },
+      "assetData": { "title": "Sales Q4", "axes": ["month","revenue"] },
       "createdAt": "2025-09-11T17:18:53.9766385+03:00"
     }
   ]
   ```
 
-Update an asset in favourites  
+- Update a favourite  
 ```bash
 curl -X PUT -H "Content-Type: application/json" \
-  -d '{"assetId":"chart-21", "assetType":"chart", "description":"Sales frequency", "metadata":{"title":"Annual retention","axes":["month","invoice_count"]}}' \
+  -d '{"assetId":"chart-21", "assetType":"chart", "description":"Sales frequency", "assetData":{"title":"Annual retention","axes":["month","invoice_count"]}}' \
   http://localhost:8080/favourites/user123/fav-1
 ```
 
-Delete a favourite  
+- Delete a favourite  
 ```bash
 curl -X DELETE http://localhost:8080/favourites/user123/fav-1
 ```
 
 ## Assumptions
 - REST API endpoints to fetch, add, remove and update assets in favourites list
-- JSON request/response
+- JSON request/response with lower-camel JSON keys (id, userId, assetId, assetType, description, assetData, createdAt)
 - In-memory store for the challenge purposes
-- Tests for GET, POST, PUT, PATCH and DELETE verbs and store functions
+- Tests for GET, POST, PUT and DELETE verbs and store functions
+
+## Data model
+- This service stores references to existing platform assets. The source of truth for assets lives upstream.
+- `description` is a user-provided label for the favourite and may be empty.
+- `assetData` stores the upstream asset JSON as-is (flexible); on updates, clients send the full updated asset JSON. The service does not validate against upstream schemas.
+- On reads, the service returns stored favourites. If upstream assets are missing, clients are expected to avoid selecting them; future versions may exclude or flag missing assets when an upstream lookup is enabled.
+
+## CI/CD (suggested checks)
+In a CI pipeline, you can run basic quality gates before building and deploying:
+
+```bash
+# Format code
+go fmt ./...
+
+# Static analysis
+go vet ./...
+staticcheck ./...
+
+# Run tests
+go test ./...
+```
 
 ## Next steps
-- Solution is base on in-memory store which makes storage ephemeral and works for single instace only. Persistent storage should be used, for instance Postgres JSONB, or adopt with platform-wide storage solution.
-- Performance: caching per user with Redis since it is shown in the frontpage
+- Solution is based on an in-memory store which makes storage ephemeral and works for a single instance only. Persistent storage should be used, for instance Postgres JSONB, or adopt a platform-wide storage solution.
+- Coordinate upstream contracts for asset verification and potential reconciliation (exclusion/flags for missing assets) once teams align
+- Performance: caching per user with Redis since it is shown on the front page
 - Performance: pagination for very large lists
