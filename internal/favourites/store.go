@@ -9,7 +9,7 @@ import (
 
 // Store defines the behaviour for managing favourites.
 type Store interface {
-	AddFavourite(Favourite) error
+	AddFavourite(Favourite) (Favourite, error)
 	GetFavourites(userID string) ([]Favourite, error)
 	UpdateFavourite(userID, favouriteID string, update Favourite) (Favourite, error)
 	DeleteFavourite(userID, favouriteID string) error
@@ -30,21 +30,19 @@ func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{store: make(map[string][]Favourite)}
 }
 
-func (s *InMemoryStore) AddFavourite(f Favourite) error {
+func (s *InMemoryStore) AddFavourite(f Favourite) (Favourite, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Enforces uniqueness on (userId, assetId).
-	// NOTE: With a persistent DB backend (e.g., Postgres JSONB), this uniqueness
-	// would be enforced with a UNIQUE index on (userId, assetId).
 	for i := range s.store[f.UserID] {
 		if s.store[f.UserID][i].AssetID == f.AssetID {
-			return ErrConflict
+			return Favourite{}, ErrConflict
 		}
 	}
 	f.CreatedAt = time.Now()
 	f.UpdatedAt = f.CreatedAt
 	s.store[f.UserID] = append(s.store[f.UserID], f)
-	return nil
+	return f, nil
 }
 
 func (s *InMemoryStore) GetFavourites(userID string) ([]Favourite, error) {

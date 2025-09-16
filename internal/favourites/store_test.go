@@ -3,7 +3,6 @@ package favourites
 import (
 	"encoding/json"
 	"testing"
-	"time"
 )
 
 func TestAddAndGetFavourites(t *testing.T) {
@@ -14,22 +13,22 @@ func TestAddAndGetFavourites(t *testing.T) {
 		UserID:      "user-1",
 		AssetID:     "chart-1",
 		AssetType:   "chart",
+		AssetData:   json.RawMessage(`{"title":"Chart-1"}`),
 		Description: "First chart",
-		CreatedAt:   time.Now(),
 	}
 	fav2 := Favourite{
 		ID:          store.NextFavouriteID(),
 		UserID:      "user-1",
 		AssetID:     "chart-2",
 		AssetType:   "chart",
+		AssetData:   json.RawMessage(`{"title":"Chart-2"}`),
 		Description: "Second chart",
-		CreatedAt:   time.Now(),
 	}
 
-	if err := store.AddFavourite(fav1); err != nil {
+	if _, err := store.AddFavourite(fav1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := store.AddFavourite(fav2); err != nil {
+	if _, err := store.AddFavourite(fav2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -49,16 +48,16 @@ func TestUpdateFavourite(t *testing.T) {
 		UserID:      "user-1",
 		AssetID:     "chart-1",
 		AssetType:   "chart",
+		AssetData:   json.RawMessage(`{"title":"Chart-1"}`),
 		Description: "Old",
-		CreatedAt:   time.Now(),
 	}
-	_ = store.AddFavourite(fav)
+	_, _ = store.AddFavourite(fav)
 
 	update := Favourite{
 		AssetID:     "chart-99",
 		AssetType:   "chart",
-		Description: "New",
 		AssetData:   json.RawMessage(`{"title":"Updated"}`),
+		Description: "New",
 	}
 
 	updated, err := store.UpdateFavourite("user-1", fav.ID, update)
@@ -88,7 +87,7 @@ func TestDeleteFavourite(t *testing.T) {
 		ID:     store.NextFavouriteID(),
 		UserID: "user-1",
 	}
-	_ = store.AddFavourite(fav)
+	_, _ = store.AddFavourite(fav)
 
 	if err := store.DeleteFavourite("user-1", fav.ID); err != nil {
 		t.Fatalf("unexpected error: %v", err)

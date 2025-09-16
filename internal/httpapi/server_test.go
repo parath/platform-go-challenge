@@ -19,7 +19,9 @@ type MockStore struct {
 	Err error
 }
 
-func (m *MockStore) AddFavourite(favourites.Favourite) error                     { return m.Err }
+func (m *MockStore) AddFavourite(favourites.Favourite) (favourites.Favourite, error) {
+	return favourites.Favourite{}, m.Err
+}
 func (m *MockStore) GetFavourites(userID string) ([]favourites.Favourite, error) { return nil, m.Err }
 func (m *MockStore) UpdateFavourite(userID, favouriteID string, update favourites.Favourite) (favourites.Favourite, error) {
 	return favourites.Favourite{}, m.Err

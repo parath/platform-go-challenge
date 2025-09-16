@@ -117,17 +117,17 @@ func (s *Server) addFavouriteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	f.UserID = userID
 	f.ID = s.store.NextFavouriteID()
-	err := s.store.AddFavourite(f)
+	created, err := s.store.AddFavourite(f)
 	if err != nil {
 		if errors.Is(err, favourites.ErrConflict) {
-			writeError(w, r, http.StatusConflict, "favourite already exists for user and asset", "conflict")
+			writeError(w, r, http.StatusConflict, "favourite already exists for user and asset", CodeConflict)
 			return
 		}
-		writeError(w, r, http.StatusInternalServerError, "failed to add favourite", "store_error")
+		writeError(w, r, http.StatusInternalServerError, "failed to add favourite", CodeStoreError)
 		return
 	}
 
-	writeOK(w, r, http.StatusCreated, f, fmt.Sprintf("userId=%s favId=%s", f.UserID, f.ID))
+	writeOK(w, r, http.StatusCreated, created, fmt.Sprintf("userId=%s favId=%s", created.UserID, created.ID))
 }
 
 func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) {

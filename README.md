@@ -48,6 +48,7 @@ curl -X POST -H "Content-Type: application/json" \
   "description": "Top sales",
   "assetData": { "title": "Sales Q4", "axes": ["month","revenue"] },
   "createdAt": "2025-09-11T17:18:53.9766385+03:00"
+  "updatedAt": "2025-09-11T17:18:53.9766385+03:00"
 }
 ```
 
@@ -66,6 +67,7 @@ curl -s http://localhost:8080/favourites/user123 | jq
       "description": "Top sales",
       "assetData": { "title": "Sales Q4", "axes": ["month","revenue"] },
       "createdAt": "2025-09-11T17:18:53.9766385+03:00"
+      "updatedAt": "2025-09-11T17:18:53.9766385+03:00"
     }
   ]
   ```
@@ -84,8 +86,8 @@ curl -X DELETE http://localhost:8080/favourites/user123/fav-1
 
 ## Assumptions
 - REST API endpoints to fetch, add, remove and update assets in favourites list
-- JSON request/response with lower-camel JSON keys (id, userId, assetId, assetType, description, assetData, createdAt)
-- In-memory store for the challenge purposes
+- JSON request/response with lower-camel JSON keys (id, userId, assetId, assetType, description, assetData, createdAt, updatedAt)
+- In-memory store for the challenge purposes. No data store persistence present. Stored data are lost on restart.
 - Tests for GET, POST, PUT and DELETE verbs and store functions
 
 ## Data model
