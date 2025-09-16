@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/parath/platform-go-challenge/internal/favourites"
@@ -56,16 +55,9 @@ func writeOK(w http.ResponseWriter, r *http.Request, status int, v any, extras s
 	writeJSON(w, status, v)
 }
 
-// validation helpers
-const (
-	assetTypeChart    = "chart"
-	assetTypeInsight  = "insight"
-	assetTypeAudience = "audience"
-)
-
-func isValidAssetType(t string) bool {
+func isValidAssetType(t favourites.AssetType) bool {
 	switch t {
-	case assetTypeChart, assetTypeInsight, assetTypeAudience:
+	case favourites.AssetTypeChart, favourites.AssetTypeInsight, favourites.AssetTypeAudience:
 		return true
 	default:
 		return false
@@ -78,7 +70,7 @@ func validateFavouriteInput(f favourites.Favourite) (string, ErrorCode) {
 	if f.AssetID == "" {
 		return "assetId is required", CodeInvalidBody
 	}
-	if !isValidAssetType(string(f.AssetType)) {
+	if !isValidAssetType(f.AssetType) {
 		return "invalid assetType", CodeInvalidBody
 	}
 	if len(f.AssetData) > 100*1024 { // ~100KB safety cap
@@ -125,8 +117,6 @@ func (s *Server) addFavouriteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	f.UserID = userID
 	f.ID = s.store.NextFavouriteID()
-	f.CreatedAt = time.Now()
-	f.UpdatedAt = f.CreatedAt
 	err := s.store.AddFavourite(f)
 	if err != nil {
 		if errors.Is(err, favourites.ErrConflict) {
@@ -153,7 +143,6 @@ func (s *Server) updateFavouriteHandler(w http.ResponseWriter, r *http.Request) 
 		writeError(w, r, http.StatusBadRequest, msg, code)
 		return
 	}
-	upd.UpdatedAt = time.Now()
 	updated, err := s.store.UpdateFavourite(userID, favID, upd)
 	if err != nil {
 		if errors.Is(err, favourites.ErrNotFound) {

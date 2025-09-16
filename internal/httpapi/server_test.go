@@ -210,6 +210,17 @@ func TestAddFavourite_StoreError(t *testing.T) {
 	}
 }
 
+// --- Conflict tests ---
+func TestPostFavourite_DuplicateConflict(t *testing.T) {
+	r := newTestServer()
+	payload := map[string]any{"assetId": "a1", "assetType": "chart"}
+	_ = doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rr.Code)
+	}
+}
+
 // --- Validation tests ---
 func TestPostFavourite_Validation_MissingAssetId(t *testing.T) {
 	r := newTestServer()
@@ -235,17 +246,6 @@ func TestPostFavourite_Validation_InvalidAssetType(t *testing.T) {
 	}
 }
 
-// --- Conflict tests ---
-func TestPostFavourite_DuplicateConflict(t *testing.T) {
-	r := newTestServer()
-	payload := map[string]any{"assetId": "a1", "assetType": "chart"}
-	_ = doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
-	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d", rr.Code)
-	}
-}
-
 func TestPutFavourite_ChangeToExistingAsset_Conflict(t *testing.T) {
 	r := newTestServer()
 	fav1 := createFavourite(t, r, "user-1", map[string]any{"assetId": "a1", "assetType": "chart"})
@@ -255,5 +255,32 @@ func TestPutFavourite_ChangeToExistingAsset_Conflict(t *testing.T) {
 	rr := doRequest(t, r, http.MethodPut, path, upd)
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d", rr.Code)
+	}
+}
+
+func TestPostFavourite_Validation_LongDescription(t *testing.T) {
+	r := newTestServer()
+	payload := map[string]any{
+		"assetId":     "chart-1",
+		"assetType":   "chart",
+		"description": string(make([]byte, 600)), // >512 chars
+	}
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestPostFavourite_Validation_AssetDataTooLarge(t *testing.T) {
+	r := newTestServer()
+	huge := make([]byte, 200*1024) // 200KB > 100KB limit
+	payload := map[string]any{
+		"assetId":   "chart-2",
+		"assetType": "chart",
+		"assetData": huge,
+	}
+	rr := doRequest(t, r, http.MethodPost, "/favourites/user-1", payload)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
 	}
 }
