@@ -87,8 +87,8 @@ curl -X DELETE http://localhost:8080/favourites/user123/fav-1
 ```
 
 ## Assumptions
-- REST API endpoints to fetch, add, remove and update assets in favourites list
-- JSON request/response with lower-camel JSON keys (id, userId, assetId, assetType, description, assetData, createdAt, updatedAt)
+- REST API endpoints to fetch, add, remove and update assets in favourites list.
+- JSON request/response with lower-camel JSON keys (id, userId, assetId, assetType, description, assetData, createdAt, updatedAt).
 - In-memory store for the challenge purposes. No data store persistence present. Stored data are lost on restart.
 - Tests cover store methods, HTTP handlers, validation, conflicts and error paths (including with a mock store).
 
@@ -115,6 +115,7 @@ go test ./...
 
 ## Next steps
 - Solution is based on an in-memory store which makes storage ephemeral and works for a single instance only. Persistent storage should be used, for instance Postgres JSONB, or adopt a platform-wide storage solution.
-- Coordinate upstream contracts for asset verification and potential reconciliation (exclusion/flags for missing assets) once teams align
-- Performance: caching per user with Redis since it is shown on the front page
-- Performance: pagination for very large lists
+- Make use of request context for better efficiency, especially when a persistent store is integrated.
+- Coordinate upstream contracts for asset verification and potential reconciliation (exclusion/flags for missing assets) once teams align.
+- Performance: caching per user with Redis since it is shown on the front page.
+- Performance: pagination for very large lists.
